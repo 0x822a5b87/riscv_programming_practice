@@ -19,21 +19,21 @@
  * 下面这句话会在预编译阶段变成：
  *  asm volatile("csrr %0, " "reg" : "=r" (__val)); __val; });
  */
-#define read_csr(csr)						\
-({								\
-	register unsigned long __v;				\
+#define read_csr(csr)                               \
+({                                                  \
+	register unsigned long __v;                     \
 	__asm__ __volatile__ ("csrr %0, " #csr			\
-			      : "=r" (__v) :			\
-			      : "memory");			\
-	__v;							\
+			      : "=r" (__v) :			        \
+			      : "memory");			            \
+	__v;							                \
 })
 
-#define write_csr(csr, val)					\
-({								\
+#define write_csr(csr, val)					        \
+({								                    \
 	unsigned long __v = (unsigned long)(val);		\
 	__asm__ __volatile__ ("csrw " #csr ", %0"		\
-			      : : "rK" (__v)			\
-			      : "memory");			\
+			      : : "rK" (__v)			        \
+			      : "memory");			            \
 })
 
 #endif /*_ASM_RISCV_CSR_H*/
