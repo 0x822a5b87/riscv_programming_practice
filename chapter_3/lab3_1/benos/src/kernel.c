@@ -14,7 +14,7 @@ void kernel_main(void)
 
 	asm_test();
 
-	while (1) {
-		;
-	}
+//	while (1) {
+//		;
+//	}
 }
