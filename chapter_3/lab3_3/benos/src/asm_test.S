@@ -9,14 +9,23 @@ my_test_data:
 .global load_store_test
 load_store_test:
 	li t0, 0x80200000
+	# 0x801FFFFC:            	0x00	0x00	0x00	0x00
+	# 0x80200000 <_start>:	    0x73	0x10	0x40	0x10
+	# 0x80200004 <_start+4>:	0x17	0x11	0x00	0x00
 
-	lb t1, (t0)
-	lb t1, 4(t0)
-	lb t1, -4(t0)
-	ld t1, (t0)
-	lb t1, 4(t0)
 
+	lb t1, (t0)                 # t1 = 0x0000000000000073
+	lb t1, 4(t0)                # t1 = 0x0000000000000017
+	lb t1, -4(t0)               # t1 = 0x0000000000000000
+	ld t1, (t0)                 # t1 = 0x0000111710401073
+	lb t1, 4(t0)                # t1 = 0x0000000000000017
+
+    # pc = 0x802002b4 <load_store_test+28>:	0xb7
+    # t0 = 0x80200000 <_start>:	0x73
 	lui t0, 0x80200
+    # pc = 0x802002b8 <load_store_test+32>:	0x37
+    # t0 = 0xffffffff80200000
+
 	lui t1, 0x40200
 
 	la t0, my_test_data
