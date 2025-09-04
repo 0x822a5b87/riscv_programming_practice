@@ -24,7 +24,7 @@ load_store_test:
     # t0 = 0x80200000 <_start>:	0x73
 	lui t0, 0x80200
     # pc = 0x802002b8 <load_store_test+32>:	0x37
-    # t0 = 0xffffffff80200000
+    # t0 = 0xffffffff8020000
 
 	lui t1, 0x40200
 
