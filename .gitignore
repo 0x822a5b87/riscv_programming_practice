@@ -3,6 +3,10 @@ build/
 build_src/
 build_sbi/
 
+cmake-build-debug/
+cmake-build-debug-riscv-environment/
+CMakeFiles/
+
 .gdb_history
 *.bin
 *.elf
