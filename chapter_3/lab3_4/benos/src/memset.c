@@ -1,6 +1,6 @@
 #include "memset.h"
 
-extern void *__memset_16bytes_asm(void *s, unsigned long val, unsigned long count); 
+extern void *__my_memset_16bytes_asm(void *s, unsigned long val, unsigned long count);
 
 static void __memset_16bytes_inline_asm(void *p, unsigned long val,
 		int count)
@@ -57,8 +57,8 @@ static void *__memset(char *s, int c, size_t count)
 		n = left / align;
 		left = left % align;
 
-#if 0
-		__memset_16bytes_asm(p, data, 16*n);
+#if 1
+		__my_memset_16bytes_asm(p, data, 16*n);
 #else
 		__memset_16bytes_inline_asm(p, data, 16*n);
 #endif
@@ -70,7 +70,7 @@ static void *__memset(char *s, int c, size_t count)
 	return s;
 }
 
-void *memset(void *s, int c, size_t count)
+void *my_memset(void *s, int c, size_t count)
 {
-	return __memset(s, c, count);
+	return __my_memset_16bytes_asm(s, c, count);
 }

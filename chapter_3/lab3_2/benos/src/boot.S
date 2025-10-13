@@ -1,20 +1,21 @@
-.section ".text.boot"
+	.section ".text.boot"
 
-.globl _start
+	.globl   _start
 _start:
-	/* 关闭中断 */
-	csrw sie, zero
+	csrw     sie, zero
 
-	/* 设置栈, 栈的大小为4KB */
-	la sp, stacks_start
-	li t0, 4096
-	add sp, sp, t0
+	la       sp, stacks_start
+	li       t0, 4096
+	add      sp, sp, t0
 
-	/* 跳转到C语言 */
-	tail kernel_main
+	tail     kernel_main
 
-.section .data
-.align  12
-.global stacks_start
+	.section .data
+	.align   12
+	.global  my_offset
+my_offset:
+	.word    -2048
+
+	.global  stacks_start
 stacks_start:
-	.skip 4096
+	.skip    4096

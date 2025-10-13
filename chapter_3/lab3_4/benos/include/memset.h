@@ -3,6 +3,6 @@
 
 #include "type.h"
 
-void *memset(void *s, int c, size_t count);
+void *my_memset(void *s, int c, size_t count);
 
 #endif

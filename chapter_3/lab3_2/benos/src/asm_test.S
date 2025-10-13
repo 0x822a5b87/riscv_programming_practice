@@ -8,6 +8,29 @@ my_test_data:
 .align 3
 .global load_store_test
 load_store_test:
+# auipc    t0, 1
+# addi     t0, t0, -2048;
+# ld       t1, -2048(t0)    # t1 = (double *) t0
+#
+# 在这段代码中，我们可以认为过程如下：
+#
+# t0 = PC + 0x1000
+# t0 = t0 - 0x800
+# t1 = *(t0 - 0x800)
+
+	# 计算跳转目标值
+	# ► 0x80200014 <_start+20> auipc t0, 1 T0 => 0x80201014 (stacks_start+16)
+	# t0 = 0x80201014
+	auipc    t0, 1
+
+	# t0 = 0x80201014 - 0x800 = 0x80200814
+	addi     t0, t0, -2048;
+
+	# *T1   0x8002829300001297 —▸ 0 ◂— 0
+	# pwndbg> print /x *(long long *) 0x80200014
+	# $1 = 0x8002829300001297
+	ld       t1, -2048(t0)    # t1 = (double *) t0
+
 	li t0, 0x80200000
 
 	lb t1, (t0)
