@@ -16,17 +16,22 @@ void asm_test(void)
 	add_sub_test();
 
 	val1 = compare_and_return(10, 9);
-       if (val1 == 0)
-               uart_send_string("compare_and_return ok\n");
-       else 
-               uart_send_string("compare_and_return fail\n");
+	if (val1 == 0)
+		uart_send_string("compare_and_return ok\n");
+	else
+		uart_send_string("compare_and_return fail\n");
 
-       val2 = compare_and_return(9, 10);
-       if (val2 == 0xffffffffffffffff)
-               uart_send_string("compare_and_return ok\n");
-       else
-	       uart_send_string("compare_and_return fail\n");
+	val2 = compare_and_return(9, 10);
+	if (val2 == 0xffffffffffffffff)
+		uart_send_string("compare_and_return ok\n");
+	else
+		uart_send_string("compare_and_return fail\n");
 
+	int val3 = compare_and_return(10, 10);
+	if (val3 == 0)
+		uart_send_string("compare_and_return ok\n");
+	else
+		uart_send_string("compare_and_return fail\n");
 }
 
 void kernel_main(void)
@@ -36,7 +41,8 @@ void kernel_main(void)
 
 	asm_test();
 
-	while (1) {
+	while (1)
+	{
 		;
 	}
 }
