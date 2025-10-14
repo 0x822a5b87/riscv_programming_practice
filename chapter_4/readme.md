@@ -1,3 +1,10 @@
+# readme
+
+## example4-1
+
+### asm
+
+```asm
 	.section .rodata
 	.align   3
 .string:
@@ -38,3 +45,53 @@ main:
 	addi     sp,sp,48                      # SP回到原点
 
 	ret
+```
+
+### stack
+
+```mermaid
+block
+  block
+    columns 1
+    new("S + 48")
+    new1("S + 40")
+    new2("S + 32")
+    new3("S + 24")
+    new4("S + 16")
+    new5("S + 8")
+    new6("S = sp - 48")
+  end
+  block
+    columns 1
+    stack1("0x80200000")
+    stack2("0x801FFFF8")
+    stack3("0x801FFFF0")
+    stack4("0x801FFFEC")
+    stack5("0x801FFFE0")
+    stack6("0x801FFFD8")
+    stack7("0x801FFFD0")
+  end
+  block
+    columns 1
+    start("sp")
+    sp1("sp - 8")
+    sp2("sp - 16")
+    sp3("sp - 24")
+    sp4("sp - 32")
+    sp5("sp - 40")
+    sp6("sp - 48")
+  end
+
+  start --> stack1
+  new1 --> stack2
+  
+  class start pink
+  class new1 pink
+  class stack2 green
+  class stack1 dotted
+
+  classDef pink   fill:#FFCCCC,stroke:#333,ont-weight: bold;
+  classDef green  fill:#696,color: #fff,font-weight: bold;
+  classDef purple fill:#969,stroke:#333;
+  classDef dotted fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
+```
