@@ -31,7 +31,9 @@ void kernel_main(void)
 {
 	uart_init();
 	int v1 = func1();
+	reset_ra();
 	int v2 = asm_func1();
+	reset_ra();
 	int v3 = asm_func1_jal();
 	if (v1 == v2) {
 		uart_send_string("asm add ok\r\n");
