@@ -514,4 +514,3 @@ add x0,   \p1, \p2
 payload_bin:
   .incbin  "benos.bin"
 ```
-
