@@ -1,0 +1,1 @@
+void my_atomic_add(unsigned long val, void *p);
