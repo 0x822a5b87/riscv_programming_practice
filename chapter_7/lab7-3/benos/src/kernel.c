@@ -1,5 +1,4 @@
 #include "uart.h"
-#include "type.h"
 #include "memset.h"
 #include "printk.h"
 
@@ -103,10 +102,46 @@ static void my_memcpy_asm_test2(unsigned long src, unsigned long dst,
 			: "memory");
 }
 
+static void __my__memset_16bytes_inline_asm(void *p, unsigned long val, int count)
+{
+	int i = 0;
+
+	asm volatile (
+		"1: sd %[val], (%[p]) \n"
+		"sd %[val], 8(%[p])\n"
+		"addi %[i], %[i], 1\n"
+		"addi %[p], %[p], 16\n"
+		"bltu %[i], %[count], 1b\n"
+		: [p] "+r" (p), [i] "+r" (i)
+		: [val] "r" (val), [count] "r" (count)
+		: "memory"
+	);
+}
+
+static void test_memset_16bytes_inline_asm(unsigned long val)
+{
+	unsigned long arr[32];
+	__my__memset_16bytes_inline_asm(arr, val, 32);
+
+	int ok = 1;
+	for (int i = 0; i < 32; i++) {
+		if (arr[i] != val) {
+			ok = 0;
+		}
+	}
+	if (ok) {
+		uart_send_string("memset 16 bytes ok!\n");
+	} else {
+		uart_send_string("memset 16 bytes failed!\n");
+	}
+}
+
 void inline_asm_test(void)
 {
 	my_memcpy_asm_test1(0x80200000, 0x80210000, 32);
 	my_memcpy_asm_test2(0x80200000, 0x80210000, 32);
+
+	test_memset_16bytes_inline_asm(0x80808080);
 
 	/*lab7-3: memset函数实现*/
 	memset((void *)0x80210002, 0x55, 48);
