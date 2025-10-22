@@ -103,23 +103,26 @@ static void my_memcpy_asm_test2(unsigned long src, unsigned long dst,
 			: "memory");
 }
 
-#define MY_OPS(ops, asm_ops) \
-static inline void my_asm_##ops(unsigned long mask, void *p) \
-{                                                     \
-	unsigned long tmp = 0;                            \
-	asm volatile (                                \
-			"ld %[tmp], (%[p])\n"              \
-			" "#asm_ops" %[tmp], %[tmp], %[mask]\n"    \
-			"sd %[tmp], (%[p])\n"               \
-			: [p] "+r"(p), [tmp]"+r" (tmp)          \
-			: [mask]"r" (mask)                   \
-			: "memory"	               \
-		     );                                \
-}
 
-MY_OPS(orr, or)
+// 总结：
+// 1. #  表示的是连接字符串，例如 #add 得到的是 "add"
+// 2. ## 表示的是连接原始文本，例如 ##add 得到的就是 add
+#define MY_OPS(ops, instruction)										\
+	static void my_asm_##ops(unsigned long n, void * p) {				\
+		asm volatile (													\
+			"ld a0, (%[p])\n"											\
+			#instruction " a0, %[n], a0\n"								\
+			"sd a0, (%[p])\n"											\
+			: [n] "+r" (n), [p] "+r" (p) 								\
+			: 															\
+			: "memory", "a0"											\
+		);																\
+	}
+
 MY_OPS(and, and)
-MY_OPS(add, add)
+MY_OPS(orr, or)
+MY_OPS(add, addw)
+
 
 static void my_ops_test(void)
 {
@@ -127,15 +130,29 @@ static void my_ops_test(void)
 
 	p = 0xf;
 	my_asm_and(0x2, &p);
-	printk("test and: p=0x%x\n", p);
+	if (0x2 == p) {
+		printk("test and ok.\n");
+	} else {
+		printk("test and error : p=0x%x\n", p);
+	}
 
 	p = 0x80;
+	unsigned long ret = (0x3 | p);
 	my_asm_orr(0x3, &p);
-	printk("test orr: p=0x%x\n", p);
+	if (p == ret) {
+		printk("test or ok.\n");
+	} else {
+		printk("test or error: p=0x%x\n", p);
+	}
 
 	p = 0x3;
+	ret = (0x2 + p);
 	my_asm_add(0x2, &p);
-	printk("test add: p=0x%x\n", p);
+	if (p == ret) {
+		printk("test add ok\n");
+	} else {
+		printk("test add error: p=0x%x, ret=%x\n", p, ret);
+	}
 }
 
 
