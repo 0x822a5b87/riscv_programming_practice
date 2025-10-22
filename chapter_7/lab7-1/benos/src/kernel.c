@@ -63,26 +63,53 @@ done:
  * 实现一个小的memcpy汇编函数
  * 从0x80200000地址拷贝32字节到0x80210000地址处，并使用gdb来比较数据是否拷贝正确
  */
-static void my_memcpy_asm_test1(unsigned long src, unsigned long dst,
-		unsigned long size)
+static void my_memcpy_asm_test1(unsigned long src, unsigned long dst, unsigned long size)
 {
+	if (size == 0) {
+		return;
+	}
+
 	unsigned long tmp = 0;
 	unsigned long end = src + size;
 
 	asm volatile (
-			"1: ld %1, (%2)\n"
-			"sd %1, (%0)\n"
-			"addi %0, %0, 8\n"
-			"addi %2, %2, 8\n"
-			"blt %2, %3, 1b"
-			: "+r" (dst), "+r" (tmp), "+r" (src)
-			: "r" (end)
-			: "memory");
+		"1: lbu %[tmp], 0(%[src])\n"
+		"sb %[tmp], 0(%[dst])\n"
+		"addi %[src], %[src], 1\n"
+		"addi %[dst], %[dst], 1\n"
+		"bltu %[src], %[end], 1b\n"
+		: [tmp] "+r" (tmp), [src] "+r" (src), [dst] "+r" (dst)
+		: [end] "r" (end)
+		: "memory"
+		);
 }
+
+static void assert_memcpy_asm_test1(unsigned long src, unsigned long dst, unsigned long size)
+{
+	unsigned long end = src + size;
+	int ok = 1;
+	while (src < end) {
+		if ((*(unsigned char *) src) != (*(unsigned char *) dst)) {
+			ok = 0;
+		}
+		src++;
+		dst++;
+	}
+	if (ok) {
+		uart_send_string("memcpy ok!\n");
+	} else {
+		uart_send_string("memcpy failed!\n");
+	}
+}
+
 
 void inline_asm_test(void)
 {
 	my_memcpy_asm_test1(0x80200000, 0x80210000, 32);
+	assert_memcpy_asm_test1(0x80200000, 0x80210000, 32);
+
+	my_memcpy_asm_test1(0x80200000, 0x80210000, 0);
+	assert_memcpy_asm_test1(0x80200000, 0x80210000, 0);
 }
 
 void asm_test(void)

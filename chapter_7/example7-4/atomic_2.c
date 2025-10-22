@@ -17,7 +17,7 @@
 7                "add %0, %0, %3\n"                                         // tmp = tmp + val
 8                "sc.d.rl %1, %0, %2\n"                                     // if (reserved) { *p = tmp; result = zero; } else { result = not zero;}
 9                "bnez %1, 1b\n"                                            // if (result != 0) { goto 1b; }
-10               : "+r" (tmp), "+r"(result), "+A"(*(unsigned long *)p)      // 
+10               : "+r" (tmp), "+r"(result), "+A"(*(unsigned long *)p)      // 在这里，我们通过 'A' 指定了将 *p 的值存到了通用寄存器
 11               : "r" (val)
 12               : "memory"
 13                );
