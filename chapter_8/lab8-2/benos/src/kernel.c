@@ -22,6 +22,7 @@ extern unsigned long func_num_syms;
 extern char func_string;
 extern void trap_init(void);
 extern void trigger_load_access_fault();
+extern void access_csr_fault();
 
 static int print_func_name(unsigned long addr)
 {
@@ -285,6 +286,7 @@ void kernel_main(void)
 
 	create_illegal_intr();
 	trigger_load_access_fault();
+	access_csr_fault();
 
 	while (1) {
 		;

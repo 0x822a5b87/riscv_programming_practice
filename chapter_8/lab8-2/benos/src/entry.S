@@ -104,10 +104,6 @@
 	ld x2,  PT_SP(sp)
 .endm
 
-/*
-   do_exception_vector必须4字节对齐
-   否则写入stvec寄存器会不成功
- */
 .align 2
 .global do_exception_vector
 do_exception_vector:
@@ -132,3 +128,12 @@ trigger_load_access_fault:
 	li a0, 0x70000000
 	ld a0, (a0)
 	ret
+
+.global access_csr_fault
+access_csr_fault:
+    li a0, 0
+    li a1, 0
+    li a2, 0
+    li a7, 0x2
+    ecall
+    ret

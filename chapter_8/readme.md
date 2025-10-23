@@ -129,3 +129,184 @@ classDef animate stroke-dasharray: 8,5,stroke-dashoffset: 900,animation: dash 25
 - `sip` Supervisor Interrupt Pending Register
 - `scause` Supervisor Cause Register
 - `stvec` Supervisor Trap Vector Base Address Register
+
+## 8.4 异常上下文
+
+寄存器可以使用一个结构体来表示：
+
+在机器运行的过程中，和机器连接最紧密的是操作系统的内核。而程序是运行在内核上，通过操作系统内核和硬件交互的。
+
+而内核和普通的程序一样，有自己的堆和栈。当出现异常时，这个结构体是被存储在内核栈上的。
+
+```c
+struct pt_regs {
+  /*31个通用寄存器 + sepc + sstatus */
+  unsigned long sepc;
+  unsigned long ra;
+  unsigned long sp;
+  unsigned long gp;
+  unsigned long tp;
+  unsigned long t0;
+  unsigned long t1;
+  unsigned long t2;
+  unsigned long s0;
+  unsigned long s1;
+  unsigned long a0;
+  unsigned long a1;
+  unsigned long a2;
+  unsigned long a3;
+  unsigned long a4;
+  unsigned long a5;
+  unsigned long a6;
+  unsigned long a7;
+  unsigned long s2;
+  unsigned long s3;
+  unsigned long s4;
+  unsigned long s5;
+  unsigned long s6;
+  unsigned long s7;
+  unsigned long s8;
+  unsigned long s9;
+  unsigned long s10;
+  unsigned long s11;
+  unsigned long t3;
+  unsigned long t4;
+  unsigned long t5;
+  unsigned long t6;
+  /*S模式下的寄存器 */
+  unsigned long sstatus;
+  unsigned long sbadaddr;
+  unsigned long scause;
+};
+```
+
+```mermaid
+flowchart LR
+
+subgraph riscv-异常前
+    direction LR
+    sstatus1("sstatus")
+    scause1("scause")  
+    stvec1("stvec")  
+    sie1("sie")  
+    sip1("sip")  
+    other1("...")  
+end
+
+subgraph 内核栈
+    direction LR
+    S_STATUS("sstatus寄存器的内容")
+    S_CAUSE("scause寄存器的内容")
+    S_TVEC("stvec寄存器的内容")
+    S_IE("sie寄存器的内容")
+    S_IP("sip寄存器的内容")
+    S_OTHERS("其他寄存器的内容")
+end
+
+subgraph riscv-异常恢复后
+    direction LR
+    sstatus2("sstatus")
+    scause2("scause")  
+    stvec2("stvec")  
+    sie2("sie")  
+    sip2("sip")  
+    other2("...")  
+end
+
+riscv-异常前 -->|中断或异常时将现场保存在内核栈| 内核栈 -->|处理异常后恢复现场| riscv-异常恢复后
+
+classDef pink 0,fill:#FFCCCC,stroke:#333, color: #fff, font-weight:bold;
+classDef green fill: #695,color: #fff,font-weight: bold;
+classDef purple fill:#968,stroke:#333, font-weight: bold;
+classDef error fill:#bbf,stroke:#f65,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
+classDef coral fill:#f8f,stroke:#333,stroke-width:4px;
+classDef animate stroke-dasharray: 8,5,stroke-dashoffset: 900,animation: dash 25s linear infinite;
+```
+
+## 8.5 实现SBI系统的调用
+
+### 8.5.1 调用ECALL指令
+
+下面这个宏的含义是：
+会将 SBI_CALL 的四个参数，存放到对应的 a0, a1, a2, a7 寄存器中
+`ecall` 是riscv中为了从低特权模式进入高特权模式（例如U模式进入S模式）的一次主动的同步异常。`ecall` 指令本身不直接携带参数（指令编码中没有参数字段），但其输入参数和输出参数通过通用寄存器传递
+
+- 系统调用号（功能标识）：存入 a7 寄存器（x17），用于指定请求的服务类型（如 “读文件”“写文件”“分配内存” 等）。
+- 具体参数：最多 7 个参数，依次存入 a0-a6 寄存器（x10-x16），对应系统调用的参数列表。
+
+例如，在linux中，如果执行 `read` 操作，那么需要以下几个参数：
+
+- `a7` == 63，表示这是一次 read 操作；
+- `a0` == fd，是 read 的第一个参数，也就是文件描述符；
+- `a1` == buffer，是缓冲区地址；
+- `a2` == 读取的最大长度。
+
+下面的代码中，实现了一个宏。这个宏接受四个参数，并且使用这个四个参数执行了一次系统调用。
+
+它不是普通的系统调用，而是 RISC-V 的 SBI 调用（Supervisor Binary Interface，监管者二进制接口），用于 S 模式（内核）向 M 模式（底层固件）请求服务。
+
+>为什么 a0 是输出（"+r"），a1/a2/a7 是输入（"r"）？
+
+SBI 是 S 模式（内核）向 M 模式（如 OpenSBI 固件）请求服务的接口，其参数和返回值约定如下：
+
+- 输入：
+  - a7：SBI 调用号（对应宏的 which，如 “设置定时器”“发送 IPI 中断”）；
+  - a0-a2：SBI 调用的 3 个参数（对应宏的 arg0-arg2）；
+  - 这些值仅作为 “请求参数” 传递给 M 模式，调用过程中不需要修改，因此是输入约束（"r"）。
+- 输出：
+  - SBI 调用的返回结果（如 “操作成功 / 失败码”“返回数据”）由 M 模式写入 a0 寄存器返回给 S 模式；
+  - 此时 a0 既有初始值（作为输入参数），又会被 M 模式修改为返回值（作为输出），因此是双向约束（"+r"）。
+
+>代码倒数第二行的 a0 是什么意思？表示 return 吗？
+
+这是 GCC 中 “语句表达式” 的语法，用于让宏返回一个值，a0 就是宏的返回值（即 SBI 调用的结果）。
+
+宏的定义用了 ({ ... a0; }) 这种格式，这是 GCC 的扩展语法（称为 “语句表达式”）：
+
+- 花括号内可以写多条语句；
+- 表达式的最后一条语句的值会作为整个表达式的返回值（类似函数的 return）。
+
+```c
+#define SBI_CALL(which, arg0, arg1, arg2) ({						\
+	register unsigned long a0 asm ("a0") = (unsigned long)(arg0);	\
+	register unsigned long a1 asm ("a1") = (unsigned long)(arg1);	\
+	register unsigned long a2 asm ("a2") = (unsigned long)(arg2);	\
+	register unsigned long a7 asm ("a7") = (unsigned long)(which);	\
+	asm volatile ("ecall"											\
+		      : "+r" (a0)											\
+		      : "r" (a1), "r" (a2), "r" (a7)						\
+		      : "memory");											\
+	a0;																\
+})
+```
+
+### 8.5.2 实现SBI的调用
+
+这段代码的实际功能就是在特定的情况下，将状态寄存器的值保存到内存，以便于后续使用。
+
+例如在发生异常的时候，要将状态寄存器的值保存到系统栈以便于在处理完后恢复。
+
+注意，这里我们在处理 `mepc` 和 `mstatus` 的时候，不能通过 `sd mepc, PT_MEPC(sp)` 的指令来直接操纵状态寄存器，而需要先读取数据到通用寄存器，随后操作通用寄存器。
+
+这直接由 RISC-V 的特权级安全模型决定：
+
+| 对比维度 | lw指令 | csrr 指令 |
+|-|-|-|
+| 访问对象 | 普通内存（数据段、栈、堆等）|系统特权寄存器（CSR，如 mepc、mstatus）|
+| 特权级别限制 | 无严格限制（低特权模式也能读允许的内存）| 严格限制（仅高特权模式能访问对应 CSR） |
+| 地址来源 | 需指定内存地址（如 sp+4） | 直接指定 CSR 名称（如 mstatus） |
+| 核心用途 | 访问程序的普通数据（变量、缓冲区）| 访问系统状态、控制硬件（异常地址、中断使能 |
+
+
+```asm
+# 读取mepc寄存器的值到通用寄存器，随后将通用寄存器存到对应的内存位置
+csrr t0, mepc
+sd t0, PT_MEPC(sp)
+
+# 读取mstatus寄存器的值到通用寄存器，随后将通用寄存器存到对应的内存位置
+csrr t0, mstatus
+sd t0, PT_MSTATUS(sp)
+```
+
+## 8.6 加载访问异常处理
+

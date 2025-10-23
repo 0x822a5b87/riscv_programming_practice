@@ -281,9 +281,14 @@ void kernel_main(void)
 	print_mem();
 
 	while (1) {
-		char c = sbi_getchar();
-		if (c == '\r') 
-			printk("enter has pressed\n");
+		int c = sbi_getchar();
+		if (c > 0 && c < 255) {
+			if (c == '\r') {  // 处理回车
+				printk("enter has pressed\n");
+			} else {  // 输出其他字符
+				printk("you pressed: %c\n", c);
+			}
+		}
 	}
 
 	while (1) {

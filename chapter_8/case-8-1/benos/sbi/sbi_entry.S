@@ -47,7 +47,6 @@ sbi_exception_vector:
 	csrr t0, mepc
 	sd t0, PT_MEPC(sp)
 
-	/*保存mstatus*/
 	csrr t0, mstatus
 	sd t0, PT_MSTATUS(sp)
 
