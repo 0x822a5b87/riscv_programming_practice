@@ -310,3 +310,48 @@ sd t0, PT_MSTATUS(sp)
 
 ## 8.6 加载访问异常处理
 
+```c
+void sbi_trap_handler(struct sbi_trap_regs *regs)
+{
+	// 获取mcause和ecall_id，这两个参数是我们定位中断/异常处理逻辑的关键信息
+	unsigned long mcause = read_csr(mcause);
+	unsigned long ecall_id = regs->a7;
+	int rc = SBI_ENOTSUPP;
+	const char *msg = "trap handler failed";
+
+	// IRQ 表示 Interruption Request，确认是否为中断请求
+	if (mcause & MCAUSE_IRQ) {
+		// 获取中断码并根据中断码执行对应的操作
+		mcause &=~ MCAUSE_IRQ;
+		switch (mcause) {
+		case IRQ_M_TIMER:
+			sbi_timer_process();
+			break;
+		default:
+			msg = "unhandled external interrupt";
+			goto trap_error;
+		}
+		return;
+	}
+
+	// 如果不是中断请求，根据请求mcause处理对应的异常
+	switch (mcause) {
+		// 对于ecall请求，我们根据ecall_id进行对应的逻辑处理
+	case CAUSE_SUPERVISOR_ECALL:
+		rc = sbi_ecall_handle(ecall_id, regs);
+		msg = "ecall handler failed";
+		break;
+	case CAUSE_LOAD_ACCESS:
+	case CAUSE_STORE_ACCESS:
+		msg = "load store access failed";
+		break;
+	default:
+		break;
+	}
+
+trap_error:
+	if (rc) {
+		sbi_trap_error(regs, msg, rc);
+	}
+}
+```
