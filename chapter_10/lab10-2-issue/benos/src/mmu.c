@@ -128,10 +128,12 @@ static void create_identical_mapping(void)
 	unsigned long end;
 
 	/*map memory*/
-	start = (unsigned long)_text_boot;
-	end = DDR_END;
+	start = (unsigned long)_text_boot; // 0x80200000
+	end = DDR_END;					   // 0x81200000
+	// (pgd_t *) idmap_pg_dir =			  0x80208000
+	// 内存布局
 	__create_pgd_mapping((pgd_t *)idmap_pg_dir, start, start,
-			end - start, PAGE_KERNEL,
+			end - start, PAGE_KERNEL_EXEC,
 			early_pgtable_alloc,
 			0);
 	printk("map memory done\n");
