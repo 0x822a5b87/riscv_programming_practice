@@ -92,16 +92,27 @@ static void __create_pgd_mapping(pgd_t *pgdir, unsigned long phys,
 		unsigned long (*alloc_pgtable)(void),
 		unsigned long flags)
 {
-	/* 由虚拟地址va和PGD基地址，找到对应PGD表项 */
+	/*
+	 * 获取虚拟地址中的PGD表索引，结合PGD页表的基址查询页表项
+	 */
 	pgd_t *pgdp = pgd_offset_raw(pgdir, virt);
+
 	unsigned long addr, end, next;
 
+	// 将 phys 中低于 PAGE_SHIFT 位的所有比特置零，实现对物理地址页对齐
 	phys &= PAGE_MASK;
+	// 只保留虚拟地址的高位，实现起始位置页对齐
 	addr = virt & PAGE_MASK;
+	// virt 作为虚拟内存的起始地址，size作为需要映射的大小
+	// 加上后根据得到的结果可以得到最终的位置
 	end = PAGE_ALIGN(virt + size);
 
 	do {
-		/* 找到pgd表项管辖的范围*/
+		/*
+		 * 计算当前 PGD 表项所能覆盖的最大地址（即当前 PGD 表项管理的地址范围终点），
+		 * 取 “该终点” 与 “总映射终点 end” 的较小值，作为本轮映射的结束地址。
+		 * 如果超过当前 PGD 表项管理的范围，则按 PGD 范围拆分
+		 */
 		next = pgd_addr_end(addr, end);
 		alloc_init_pmd(pgdp, addr, next, phys,
 				prot, alloc_pgtable, flags);
@@ -127,9 +138,12 @@ static void create_identical_mapping(void)
 	unsigned long start;
 	unsigned long end;
 
-	/*map text*/
+	// 为 .text 段做虚拟内存到物理内存的恒等映射
 	start = (unsigned long)_text_boot;
 	end = (unsigned long)_etext;
+	// 1. idmap_pg_dir 是在 linker.ld 中分配的4096个字节
+	// 2. 我们要实现恒等映射，所以虚拟内存的起始地址和物理内存的起始地址都是start
+	// 3. end - start 是我们需要映射的内容
 	__create_pgd_mapping((pgd_t *)idmap_pg_dir, start, start,
 			end - start, PAGE_KERNEL_READ_EXEC,
 			early_pgtable_alloc,
@@ -137,7 +151,7 @@ static void create_identical_mapping(void)
 
 	printk("map text done\n");
 
-	/*map memory*/
+	// 映射剩余的可用内存区域
 	start = PAGE_ALIGN((unsigned long)_etext);
 	end = DDR_END;
 	__create_pgd_mapping((pgd_t *)idmap_pg_dir, start, start,
