@@ -12,6 +12,129 @@
 - `GMO` Global Memory Order 指的是站在内存角度看到的读和写操作的次序；
 - `PPO` Preserved Program Order 保留程序次序指的是在全局内存次序中必须遵守的一些与内存次序相关的规范和约束
 
+## 内存屏障实例分析
+
+```c++
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+
+int x;
+int y;
+
+void *thread_func_1(void *arg) {
+    x = 1;
+    int a = y;
+    printf("x = %d, y = %d, a = %d\n", x, y, a);
+    return NULL;
+}
+
+void *thread_func_2(void *arg) {
+    y = 1;
+    int b = x;
+    printf("x = %d, y = %d, b = %d\n", x, y, b);
+    return NULL;
+}
+```
+
+>这段代码中，有没有可能a, b同时为0？
+
+答案是有可能的，因为编译器虽然分析出来了a 对 y，b 对 x都有依赖。但是x和y是全局变量，**线程间的写操作结果未被对方及时可见**，以及**写操作与读操作的顺序被打乱**。
+
+并且a对x，b对y是不存在依赖关系的，所以在CPU的乱序执行中。 a 和 b 的赋值可能在 x 和 y 的重新赋值之后。
+
+>若要避免这种情况，需通过内存屏障（如 fence） 或原子操作强制约束操作顺序和可见性
+
+```c++
+#include <stdio.h>
+#include <pthread.h>
+#include <stdatomic.h>  // 引入 C11 原子库
+
+int x;
+int y;
+
+void *thread_func_1(void *arg) {
+    x = 1;
+    // 写操作后插入 release 屏障：确保 x=1 对其他线程可见，且不被重排到后续读操作后
+    atomic_thread_fence(memory_order_release);
+    
+    // 读操作前插入 acquire 屏障：确保读到 y 的最新值，且不被重排到前面的写操作前
+    atomic_thread_fence(memory_order_acquire);
+    int a = y;
+    
+    printf("x = %d, y = %d, a = %d\n", x, y, a);
+    return NULL;
+}
+
+void *thread_func_2(void *arg) {
+    y = 1;
+    // 写操作后插入 release 屏障
+    atomic_thread_fence(memory_order_release);
+    
+    // 读操作前插入 acquire 屏障
+    atomic_thread_fence(memory_order_acquire);
+    int b = x;
+    
+    printf("x = %d, y = %d, b = %d\n", x, y, b);
+    return NULL;
+}
+```
+
+这里的内存屏障实现了以下几个功能：
+
+>保证了CPU之间的缓存可见性：
+>- 在弱一致性模型中，CPU 允许缓存异步更新（如 CPU0 的 M 状态数据暂不写回），但 release 会触发 “写回”（将 CPU0 的修改同步到全局可见的存储层级），acquire 会触发 “失效 / 加载”（让 CPU1 丢弃旧缓存，读取最新值）。
+>- 本质是通过内存屏障主动触发缓存同步，而非 “保证一致性”（一致性由缓存协议本身维护，屏障是触发同步的信号）。
+
+如果没有release这个指令，那么在多核多线程的情况下，部分数据可能存在CPU的高速缓存和主存不一致的情况。
+
+例如，假设有一份数据，他在CPU0的状态为M。而此时，CPU1从主存去读取数据，此时，CPU0和CPU1读到了不同的数据。
+
+这是CPU为了提高性能而使用的弱一致性模型引起的问题，这就对用户提出了要求，对于部分可能会引起数据一致性的问题的数据，用户需要通过内存屏障来手动的提示CPU保证一致性。
+
+
+>保证了CPU不会对以下指令进行乱序执行；
+
+例如，假设我们编译后的，两个线程的伪代码如下：
+
+
+```asm
+thread_1:
+    mov x, 1
+    fence.rl
+    mov y, 2
+
+thread_2:
+    mov b, x
+    fence.ac
+```
+
+那么，我们的屏障保证了 mov x, 1 一定在 mov y, 2 之前执行。
+
+但是，需要注意的是，这里并不保证thread_1和thread_2的执行顺序。也就是说，可能存在如下的执行顺序
+
+- mov b, x
+- mov x, 1
+- mov y, 2
+
+>我们增加了内存屏障之后，不会出现的是a和b同时为0的情况，实际上可能出现 a=1, b=0 或者 a=0, b=1，或者 a = 1, b = 1。因为由于内存屏障的原因，线程内部的执行顺序已经确定了：
+>- 线程 1 的 release 屏障确保 x=1 先于 a=y 执行；
+>- 线程 2 的 release 屏障确保 y=1 先于 b=x 执行；
+>- 配合 acquire 屏障的可见性，当 a=y 执行时，若 y 仍为 0，说明线程 2 的 y=1 尚未执行，但线程 1 的 x=1 已完成，此时 b=x 若执行会读到 x=1（反之亦然），因此不可能出现 a=0 且 b=0。
+
+线程一：
+
+- x = 1;
+- int a = y;
+
+线程二：
+
+- y = 1;
+- int b = x;
+
+也就是说，如果执行到 a 或者 b 的赋值语句时，x = 1 和 y = 1 中的语句至少执行了其中一个。下面列举了全部的可能执行顺序
+
+
 ## 自旋锁
 
 下面的代码中：
