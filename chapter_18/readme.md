@@ -9,6 +9,8 @@
   - `GPA` Guest Physical Address 虚拟机物理地址
   - `HVA` Host Virtual Address 宿主机虚拟地址
   - `HPA` Host Physical Address 宿主机物理地址
+- `riscv虚拟化扩展`
+  - `HS` Hypervisor-extended Supervisor 
 
 ## hypervisor和虚拟化
 
